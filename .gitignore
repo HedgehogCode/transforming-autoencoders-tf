@@ -1,3 +1,14 @@
+# MNIST data
+*.gz
+
+# Model directory
+model/
+
+# Logs
+logs/
+
+##### PYTHON stuff
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -104,5 +115,3 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# MNIST data
-*.gz
