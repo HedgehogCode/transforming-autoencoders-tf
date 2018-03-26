@@ -6,10 +6,8 @@ Hinton, Geoffrey E., Alex Krizhevsky, and Sida D. Wang. "Transforming auto-encod
 
 ## TODOs
 
-* Add affine transformations
 * Add other datasets
   * [Fashion-MNIST](https://github.com/zalandoresearch/fashion-mnist) should be easy to use
-* Make code more general
 * README
   * Add getting started
   * Add similar projects
