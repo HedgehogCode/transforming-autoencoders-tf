@@ -1,6 +1,10 @@
 import tensorflow as tf
 
-def create_transforming_autoencoder(model_dir, num_capsules, num_rec, num_gen):
+def create_transforming_autoencoder(model_dir,
+                                    num_capsules,
+                                    num_rec,
+                                    num_gen,
+                                    trans_size):
     feature_columns = [ tf.feature_column.numeric_column('image'),
                         tf.feature_column.numeric_column('transformation')]
 
@@ -10,7 +14,8 @@ def create_transforming_autoencoder(model_dir, num_capsules, num_rec, num_gen):
                     'feature_columns': feature_columns,
                     'num_capsules': num_capsules,
                     'num_rec': num_rec,
-                    'num_gen': num_gen
+                    'num_gen': num_gen,
+                    'trans_size': trans_size
                 })
 
 def model_fn(features, labels, mode, params):
@@ -22,6 +27,7 @@ def model_fn(features, labels, mode, params):
         outputs.append(capsule(in_image, in_trans,
                                n_rec=params['num_rec'],
                                n_gen=params['num_gen'],
+                               trans_size=params['trans_size'],
                                name='capsule-%d'%i))
 
     out_image = tf.add_n(outputs, name='out_image')
@@ -37,12 +43,16 @@ def model_fn(features, labels, mode, params):
     loss = tf.losses.mean_squared_error(labels=labels, predictions=out_image)
 
     # Compute evaluation metrics
-    mean_squared_error = tf.metrics.mean_squared_error(labels=labels, predictions=out_image, name='mean_squared_error_op')
+    mean_squared_error = tf.metrics.mean_squared_error(labels=labels,
+                                                predictions=out_image,
+                                                name='mean_squared_error_op')
     metrics = {'mean_squared_error': mean_squared_error}
     tf.summary.scalar('mean_squared_error', mean_squared_error[1])
 
     if mode == tf.estimator.ModeKeys.EVAL:
-        return tf.estimator.EstimatorSpec(mode, loss=loss, eval_metric_ops=metrics)
+        return tf.estimator.EstimatorSpec(mode,
+                                          loss=loss,
+                                          eval_metric_ops=metrics)
 
     # Add optimizer
     optimizer = tf.train.AdamOptimizer()
@@ -51,7 +61,7 @@ def model_fn(features, labels, mode, params):
 
 
 
-def capsule(input_img, input_trans, n_rec, n_gen, name='capsule'):
+def capsule(input_img, input_trans, n_rec, n_gen, trans_size, name='capsule'):
     with tf.variable_scope(name) as scope:
         flat = tf.layers.flatten(input_img,
                                  name='flatten')
@@ -69,9 +79,8 @@ def capsule(input_img, input_trans, n_rec, n_gen, name='capsule'):
                             name='probability')
 
         # Transformation
-        # TODO make general
         t = tf.layers.dense(r,
-                            units=2,
+                            units=trans_size,
                             activation=None,
                             name='transformation-prediction')
 
