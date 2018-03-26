@@ -4,9 +4,19 @@ def create_transforming_autoencoder(model_dir,
                                     num_capsules,
                                     num_rec,
                                     num_gen,
-                                    trans_size):
+                                    trans_size,
+                                    trans_fn):
     feature_columns = [ tf.feature_column.numeric_column('image'),
                         tf.feature_column.numeric_column('transformation')]
+
+    if not callable(trans_fn):
+        if trans_fn == 'translation':
+            trans_fn = translation_trans_fn
+        elif trans_fn == 'affine':
+            trans_fn = affine_trans_fn
+        else:
+            raise ValueError('trans_fn must be a function or a known '
+                    'transformation')
 
     return tf.estimator.Estimator(model_dir=model_dir,
                 model_fn=model_fn,
@@ -15,7 +25,8 @@ def create_transforming_autoencoder(model_dir,
                     'num_capsules': num_capsules,
                     'num_rec': num_rec,
                     'num_gen': num_gen,
-                    'trans_size': trans_size
+                    'trans_size': trans_size,
+                    'trans_fn': trans_fn
                 })
 
 def model_fn(features, labels, mode, params):
@@ -28,6 +39,7 @@ def model_fn(features, labels, mode, params):
                                n_rec=params['num_rec'],
                                n_gen=params['num_gen'],
                                trans_size=params['trans_size'],
+                               trans_fn=params['trans_fn'],
                                name='capsule-%d'%i))
 
     out_image = tf.add_n(outputs, name='out_image')
@@ -59,9 +71,22 @@ def model_fn(features, labels, mode, params):
     train_op = optimizer.minimize(loss, global_step=tf.train.get_global_step())
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
+def translation_trans_fn(trans_pred, trans_delta, name='transformation-output'):
+    return tf.add(trans_pred, trans_delta, name=name)
 
+def affine_trans_fn(trans_pred, trans_delta, name='transformation-output'):
+    with tf.variable_scope(name) as scope:
+        batch_size = tf.shape(trans_pred)[0]
+        ones = tf.ones((batch_size,1))
+        a = tf.reshape(tf.concat([trans_pred, ones], 1), (-1,3,3))
+        d = tf.reshape(tf.concat([trans_delta, ones], 1), (-1,3,3))
+        b = tf.matmul(d,a)
+        b_flat,norm = tf.split(tf.reshape(b, (-1,9)), [8,1], 1)
+        trans_out = tf.divide(b_flat, norm)
+    return trans_out
 
-def capsule(input_img, input_trans, n_rec, n_gen, trans_size, name='capsule'):
+def capsule(input_img, input_trans, n_rec, n_gen, trans_size, trans_fn,
+            name='capsule'):
     with tf.variable_scope(name) as scope:
         flat = tf.layers.flatten(input_img,
                                  name='flatten')
@@ -85,8 +110,8 @@ def capsule(input_img, input_trans, n_rec, n_gen, trans_size, name='capsule'):
                             name='transformation-prediction')
 
         # Output transformation
-        t_out = tf.add(t, input_trans,
-                       name='transformation-output')
+        t_out = trans_fn(t, input_trans,
+                         name='transformation-output')
 
 
         # Generation units

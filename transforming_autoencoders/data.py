@@ -6,6 +6,7 @@ def transformer_map(img, transformer_fn):
              'transformation': trans_delta },
             tf.contrib.image.transform(img, trans_out))
 
+# TODO remove min_trans and use -max_trans
 def translation_fn(batch_size, min_trans=-2, max_trans=2):
     # Generatre random numbers for the transformation
     x1 = tf.random_uniform((batch_size,), minval=min_trans, maxval=max_trans)
@@ -27,17 +28,31 @@ def translation_fn(batch_size, min_trans=-2, max_trans=2):
                             tf.stack([x2, y2], axis=1))
     return trans_in, trans_out, trans_delta
 
-def affine_fn(batch_size):
-    # Generate random affine transformations
-    trans_in = tf.random_uniform((batch_size,8), minval=-1, maxval=1)
-    trans_out = tf.random_uniform((batch_size,8), minval=-1, maxval=1)
+def affine_fn(batch_size, stddev, max_trans):
+    zeros = tf.zeros((batch_size,))
 
-    ones = tf.ones((batch_size,))
+    def random_affine_matrix():
+        # Generate random affine transformations
+        a0 = tf.random_normal((batch_size,), mean=1.0, stddev=stddev)
+        a1 = tf.random_normal((batch_size,), mean=0.0, stddev=stddev)
+        a2 = tf.random_uniform((batch_size,),
+                minval=-max_trans, maxval=max_trans)
+        b0 = tf.random_normal((batch_size,), mean=0.0, stddev=stddev)
+        b1 = tf.random_normal((batch_size,), mean=1.0, stddev=stddev)
+        b2 = tf.random_uniform((batch_size,),
+                minval=-max_trans, maxval=max_trans)
+        return tf.stack([a0,a1,a2,b0,b1,b2,zeros,zeros],axis=1)
+
+    trans_in = random_affine_matrix()
+    trans_out = random_affine_matrix()
+
+    ones = tf.ones((batch_size,1))
     a = tf.reshape(tf.concat([trans_in, ones], axis=1), (batch_size,3,3))
     b = tf.reshape(tf.concat([trans_out, ones], axis=1), (batch_size,3,3))
     ainv = tf.matrix_inverse(a)
     d = tf.matmul(b,ainv)
-    trans_delta = tf.split(tf.reshape(d, (batch_size,9)), [8,1], 1)
+    d_flat,norm = tf.split(tf.reshape(d, (batch_size,9)), [8,1], 1)
+    trans_delta = tf.divide(d_flat, norm)
 
     return trans_in, trans_out, trans_delta
 
