@@ -126,8 +126,6 @@ def capsule(input_img, input_trans, n_rec, n_gen, trans_size, trans_fn,
                                    activation=None,
                                    name='transformed-output')
 
-        out_flat = tf.Print(out_flat, [tf.shape(out_flat)])
-
         out = tf.reshape(out_flat, tf.shape(input_img),
                          name='reshape')
 
